@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Coletor de Produção</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Câmera em tela cheia ao fundo; painel translúcido em cima preenche OPERADOR · MÁQUINA · OP · ETAPA conforme lê; folha inferior com as perguntas finais */
+:root{ --glass:rgba(10,12,12,.58); --glass2:rgba(10,12,12,.78); --ink:#f4f6f3; --muted:#b9c0ba; --ok:#37d67a; --warn:#ffc43d; --bad:#ff6b5e; --act:#4da3ff;
+  --f-d:"Barlow Semi Condensed",system-ui,sans-serif; --f-m:"IBM Plex Mono",ui-monospace,Consolas,monospace; color-scheme:dark }
+[hidden]{display:none!important}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:#000;color:var(--ink);font-family:var(--f-d);overflow:hidden}
+video{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;background:#111}
+.ui{position:fixed;inset:0;z-index:2;display:flex;flex-direction:column;padding:calc(10px + env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));gap:10px;pointer-events:none}
+.ui>*{pointer-events:auto}
+.bar{display:flex;align-items:center;gap:8px;background:var(--glass);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-radius:14px;padding:8px 12px}
+.bar b{font-size:18px;letter-spacing:.3px}.bar .sp{flex:1}.bar small{color:var(--muted);font-size:13px}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--ok)}.dot.off{background:var(--warn)}
+.slots{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.slot{background:var(--glass);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:2px solid rgba(255,255,255,.18);border-radius:14px;padding:8px 12px;min-height:64px;transition:border-color .2s, background .2s}
+.slot .k{font-size:12px;font-weight:700;letter-spacing:1px;color:var(--muted);text-transform:uppercase;display:flex;justify-content:space-between}
+.slot .v{font-family:var(--f-m);font-size:20px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slot .s{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slot.on{border-color:var(--ok);background:rgba(16,60,34,.6)}
+.slot.flash{animation:fl .5s}
+@keyframes fl{0%{background:rgba(55,214,122,.7)}100%{background:rgba(16,60,34,.6)}}
+.reticle{flex:1;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.reticle div{width:min(78vw,460px);height:min(26vh,180px);border:3px solid rgba(255,255,255,.85);border-radius:16px;box-shadow:0 0 0 2000px rgba(0,0,0,.18)}
+.hint{text-align:center;font-size:18px;font-weight:700;text-shadow:0 1px 4px #000}
+.sheet{background:var(--glass2);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-radius:20px;padding:14px;display:flex;flex-direction:column;gap:10px;max-height:62vh;overflow:auto}
+.sheet h2{margin:0;font-size:24px;line-height:1.1}
+.sheet .sub{color:var(--muted);font-size:15px}
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+button{font:inherit;color:inherit;border:0;cursor:pointer}
+.b{min-height:64px;border-radius:14px;font-size:21px;font-weight:800;background:rgba(255,255,255,.14)}
+.b.go{background:var(--ok);color:#06170d}.b.stop{background:var(--bad);color:#200605}.b.act{background:var(--act);color:#04121f}.b.full{grid-column:1/-1}
+.b.sm{min-height:44px;font-size:16px;font-weight:700}
+.qty{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.q{border:3px solid rgba(255,255,255,.2);border-radius:14px;padding:8px 12px;background:rgba(0,0,0,.35)}
+.q.sel{border-color:var(--act)}.q .k{font-size:12px;letter-spacing:1px;color:var(--muted);font-weight:700}
+.q .v{font-family:var(--f-m);font-size:34px;font-weight:600}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.pad button{min-height:54px;border-radius:12px;background:rgba(255,255,255,.14);font-family:var(--f-m);font-size:26px;font-weight:600}
+.mot{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+.mot button{min-height:52px;border-radius:12px;background:rgba(255,255,255,.12);font-size:16px;font-weight:700;text-align:left;padding:8px 10px}
+.toast{position:fixed;left:50%;top:calc(76px + env(safe-area-inset-top));transform:translateX(-50%);z-index:5;background:#fff;color:#000;border-radius:12px;padding:10px 16px;font-size:18px;font-weight:800;max-width:92vw;text-align:center}
+.toast.bad{background:var(--bad);color:#fff}
+.modo .reticle,.modo .hint{display:none}
+.modo .slots .s{display:none}
+.done{position:fixed;inset:0;z-index:7;background:rgba(20,120,60,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:24px}
+.done .ck{font-size:96px;line-height:1}.done h3{margin:0;font-size:30px}.done p{margin:0;font-size:19px}
+.done button{margin-top:14px;min-height:56px;padding:0 26px;border-radius:14px;background:rgba(0,0,0,.35);font-size:20px;font-weight:800}
+.open{display:flex;flex-direction:column;gap:6px}.open button{display:flex;justify-content:space-between;align-items:center;min-height:54px;border-radius:12px;background:rgba(55,214,122,.22);padding:0 12px;font-size:18px;font-weight:700}
+.fill{display:flex;gap:6px;flex-wrap:wrap}.fill button{min-height:44px;padding:0 12px;border-radius:10px;background:rgba(77,163,255,.25);font-size:16px;font-weight:700}
+.start{position:fixed;inset:0;z-index:6;background:#0b0d0c;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;text-align:center}
+.start h1{font-size:30px;margin:0}.start p{color:var(--muted);font-size:17px;max-width:520px;margin:0}
+input.k{position:fixed;left:-1000px;top:0;opacity:0}
+.manual{display:flex;gap:6px}.manual input{flex:1;min-width:0;font-family:var(--f-m);font-size:20px;padding:10px;border-radius:12px;border:0;background:rgba(255,255,255,.9);color:#000}
+.when{display:flex;flex-wrap:wrap;gap:6px}.when button{min-height:44px;padding:0 12px;border-radius:10px;background:rgba(255,255,255,.14);font-size:16px;font-weight:700}.when button.on{background:var(--act);color:#04121f}
+@media (orientation:landscape) and (min-width:900px){ .slots{grid-template-columns:repeat(4,1fr)} .sheet{max-width:640px;margin-left:auto;width:100%} }
+</style>
+</head>
+<body>
+<video id="cam" playsinline muted autoplay></video>
+<div class="ui">
+  <div class="bar"><span class="dot" id="net"></span><b>Coletor</b><small id="fila"></small><span class="sp"></span><button class="b sm" id="btn-luz" style="padding:0 12px" hidden>Lanterna</button><button class="b sm" id="btn-limpar" style="padding:0 12px">Trocar operador/máquina</button></div>
+  <div class="slots">
+    <div class="slot" id="s-operador"><div class="k">Operador <span>①</span></div><div class="v">—</div><div class="s">crachá</div></div>
+    <div class="slot" id="s-maquina"><div class="k">Máquina <span>②</span></div><div class="v">—</div><div class="s">etiqueta da máquina</div></div>
+    <div class="slot" id="s-op"><div class="k">OP <span>③</span></div><div class="v">—</div><div class="s">código da OP impressa</div></div>
+    <div class="slot" id="s-etapa"><div class="k">Etapa <span>④</span></div><div class="v">—</div><div class="s">vem da OP</div></div>
+  </div>
+  <div class="reticle"><div></div></div>
+  <div class="hint" id="hint">Aponte para o crachá</div>
+  <div class="sheet" id="sheet" hidden></div>
+</div>
+<input class="k" id="kbd" autocomplete="off" aria-label="Leitor Bluetooth">
+<div class="toast" id="toast" hidden></div>
+<div class="done" id="done" hidden><div class="ck">✓</div><h3 id="done-t"></h3><p id="done-s"></p><button id="btn-desfazer">Desfazer</button></div>
+<div class="start" id="start">
+  <h1>Coletor de apontamento</h1>
+  <p>A câmera lê crachá, máquina e OP em sequência. Leitor Bluetooth também funciona. Os dados vão para a fila do ERP.</p>
+  <button class="b go" id="btn-start" style="padding:0 28px">Abrir câmera</button>
+  <button class="b sm" id="btn-nocam" style="padding:0 18px">Usar só o leitor Bluetooth</button>
+  <p id="cfgmsg" style="font-size:14px"></p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
+<script>
+(()=>{
+"use strict";
+/* ===== CONFIGURAÇÃO ===== */
+/* Endereço e senha NÃO ficam no código (página pública). Cada aparelho recebe uma vez pelo link de configuração:
+   https://<site>/#u=<ID-da-implantação>&k=<senha>  — fica guardado no aparelho. */
+const CFG=(()=>{ let c={}; try{ c=JSON.parse(localStorage.getItem("cfg")||"{}"); }catch(e){}
+  const h=new URLSearchParams(location.hash.slice(1));
+  if(h.get("u")&&h.get("k")){ c={u:h.get("u"),k:h.get("k")}; try{ localStorage.setItem("cfg",JSON.stringify(c)); }catch(e){} history.replaceState(null,"",location.pathname); }
+  return c; })();
+const API_URL = CFG.u ? "https://script.google.com/macros/s/"+CFG.u+"/exec" : "";
+const TOKEN   = CFG.k || "";
+const PREF_OPERADOR = /^(OPR|CR|MAT)[-: ]?(\w+)$/i;   // crachá: ex. OPR-1234
+const PREF_MAQUINA  = /^(MQ|MAQ)[-: ]?(.+)$/i;        // etiqueta de máquina: ex. MQ-PB001 (ou só PB001)
+/* ======================== */
+
+const DEMO={ ops:[{op:"74271",fase:99,maquina_prog:"BH001",cliente:"EXEMPLO",descricao:"ITEM DE EXEMPLO",restante:6000}],
+  maquinas:[{codigo:"BH001"},{codigo:"PB001"},{codigo:"TR001"}], operadores:[{cracha:"1234",nome:"Exemplo"}],
+  motivos:[[1,"SETUP"],[8,"FALTA DE MATERIA PRIMA"],[9,"MANUTENÇÃO"],[3,"FALTA DE OPERADOR"],[2,"MANUTENCAO DE FERRAMENTA"],[20,"PROBLEMAS DE QUALIDADE"],[24,"TROCA DE BOBINA"],[25,"AGUARDANDO TEMPERATURA"],[7,"ALMOÇO"],[10,"OUTROS"]].map(m=>({codigo:m[0],descricao:m[1]})), abertos:[] };
+const S={ cad:null, slots:{operador:null,maquina:null,op:null,etapa:null}, q:{boa:"",refugo:""}, qsel:"boa", modo:null, inicioManual:null, last:{code:"",t:0} };
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const fmtN=n=>Number(n||0).toLocaleString("pt-BR");
+const hhmm=d=>new Date(d).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+let tT; function toast(m,bad){ const t=$("toast"); t.textContent=m; t.className="toast"+(bad?" bad":""); t.hidden=false; clearTimeout(tT); tT=setTimeout(()=>t.hidden=true,2200); }
+let actx=null; function beep(ok=true){ try{ actx=actx||new (window.AudioContext||window.webkitAudioContext)(); const o=actx.createOscillator(), g=actx.createGain(); o.frequency.value=ok?1650:320; g.gain.value=.15; o.connect(g); g.connect(actx.destination); o.start(); o.stop(actx.currentTime+(ok?.09:.25)); }catch(e){} try{ navigator.vibrate&&navigator.vibrate(ok?60:[80,60,80]); }catch(e){} }
+const store={ get(k,d){ try{ return JSON.parse(localStorage.getItem(k)||"null")??d; }catch(e){ return d; } }, set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} } };
+
+/* ---------- dados ---------- */
+async function carregar(){
+  if(!API_URL){ S.cad=DEMO; $("cfgmsg").textContent="Modo demonstração: abra o link de configuração enviado pelo responsável."; return; }
+  try{ const r=await fetch(API_URL+"?t="+encodeURIComponent(TOKEN)); const j=await r.json(); if(j.erro) throw new Error(j.erro);
+    S.cad=j; store.set("cad",j); $("net").classList.remove("off"); }
+  catch(e){ S.cad=store.get("cad",DEMO); $("net").classList.add("off"); toast("Sem conexão: usando a última lista de OPs.",true); }
+}
+function fila(){ return store.get("fila",[]); }
+function enfileirar(p,atraso){ const f=fila(); p._apos=Date.now()+(atraso||0); f.push(p); store.set("fila",f); enviarFila(); if(atraso) setTimeout(enviarFila,atraso+200); }
+let enviando=false;
+async function enviarFila(){
+  const f=fila(); $("fila").textContent=f.length?`· ${f.length} aguardando envio`:"";
+  if(!API_URL||enviando||!f.length) return; enviando=true;
+  try{ while(fila().length){ const p=fila()[0]; if(p._apos&&p._apos>Date.now()) break;
+      const r=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({...p,_apos:undefined,t:TOKEN})});
+      const j=await r.json(); if(!j.ok) throw new Error(j.erro||"falha"); store.set("fila",fila().slice(1)); }
+    $("net").classList.remove("off"); }
+  catch(e){ $("net").classList.add("off"); }
+  enviando=false; const n=fila().length; $("fila").textContent=n?`· ${n} aguardando envio`:"· tudo enviado";
+}
+setInterval(enviarFila,30000);
+function abertosLocais(){ return store.get("abertos",[]); }
+function abertoDe(maq,op){ return abertosLocais().find(a=>a.maquina===maq&&String(a.op)===String(op)) || (S.cad.abertos||[]).find(a=>a.maquina===maq&&String(a.op)===String(op)); }
+
+/* ---------- classificação do código lido ---------- */
+function classificar(raw){
+  const c=String(raw).trim().replace(/^\*|\*$/g,""); if(!c) return null;
+  let m;
+  if((m=c.match(PREF_OPERADOR))) return {t:"operador",v:m[2]};
+  if(/^\d{4,7}$/.test(c)){ const op=(S.cad.ops||[]).find(o=>String(o.op)===c); if(op) return {t:"op",v:c,o:op}; }
+  const mq=c.match(PREF_MAQUINA)?c.match(PREF_MAQUINA)[2].toUpperCase():c.toUpperCase();
+  if((S.cad.maquinas||[]).some(x=>String(x.codigo).toUpperCase()===mq)) return {t:"maquina",v:mq};
+  if((S.cad.operadores||[]).some(x=>String(x.cracha)===c)) return {t:"operador",v:c};
+  if(/^\d{4,7}$/.test(c)) return {t:"op",v:c,o:null};
+  if(/^(ETP|OPE|F)[-: ]?\d{1,3}$/i.test(c)) return {t:"etapa",v:c.replace(/\D/g,"")};
+  return {t:"?",v:c};
+}
+function lido(raw){
+  const now=Date.now(); if(raw===S.last.code && now-S.last.t<2500) return; S.last={code:raw,t:now};
+  if(S.modo==="qtd") return;
+  const k=classificar(raw); if(!k) return;
+  if(k.t==="?"){ beep(false); toast("Código não reconhecido: "+k.v,true); return; }
+  if(k.t==="op" && S.slots.maquina){ const ab=abertoDe(S.slots.maquina,k.v); if(ab && !S.modo){ S.slots.op=k.v; S.opInfo=k.o||null; S.slots.etapa=k.o&&k.o.fase!=null?String(k.o.fase):S.slots.etapa; S.modoColeta="OPERADOR"; beep(true); flash("op"); pedirQtd(ab.inicio); return; } }
+  S.slots[k.t]=k.v;
+  if(k.t==="op"){ S.slots.etapa = k.o && k.o.fase!=null ? String(k.o.fase) : S.slots.etapa; S.opInfo=k.o||null; if(k.o&&k.o.restante===0) toast("Atenção: OP sem saldo a produzir no ERP",true); }
+  beep(true); flash(k.t); salvarSticky(); render();
+}
+function flash(t){ const el=$("s-"+t); if(!el) return; el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash"); }
+function salvarSticky(){ store.set("sticky",{operador:S.slots.operador,maquina:S.slots.maquina}); }
+
+/* ---------- câmera ---------- */
+let detector=null, zx=null;
+async function abrirCamera(){
+  const v=$("cam");
+  try{
+    const st=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"},width:{ideal:1280},height:{ideal:720}},audio:false});
+    v.srcObject=st; await v.play();
+    try{ const tr=st.getVideoTracks()[0]; const cap=tr.getCapabilities?tr.getCapabilities():{}; if(cap.focusMode&&cap.focusMode.includes("continuous")) tr.applyConstraints({advanced:[{focusMode:"continuous"}]});
+      if(cap.torch){ let on=false; const b=$("btn-luz"); b.hidden=false; b.onclick=()=>{ on=!on; tr.applyConstraints({advanced:[{torch:on}]}).catch(()=>{}); b.style.background=on?"var(--warn)":""; b.style.color=on?"#000":""; }; } }catch(e){}
+    if("BarcodeDetector" in window){
+      const fmts=await BarcodeDetector.getSupportedFormats(); detector=new BarcodeDetector({formats:["code_39","code_128","itf","ean_13","codabar","qr_code","data_matrix"].filter(f=>fmts.includes(f))});
+      const loop=async()=>{ try{ if(v.readyState>=2){ const r=await detector.detect(v); r.forEach(x=>lido(x.rawValue)); } }catch(e){} setTimeout(loop,140); }; loop();
+    } else if(window.ZXing){
+      const hints=new Map(); hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,[ZXing.BarcodeFormat.CODE_39,ZXing.BarcodeFormat.CODE_128,ZXing.BarcodeFormat.ITF,ZXing.BarcodeFormat.QR_CODE]); hints.set(ZXing.DecodeHintType.TRY_HARDER,true);
+      zx=new ZXing.BrowserMultiFormatReader(hints,150); zx.decodeFromVideoElementContinuously(v,(res)=>{ if(res) lido(res.getText()); });
+    } else toast("Este navegador não lê código pela câmera. Use o leitor Bluetooth.",true);
+  }catch(e){ toast("Câmera bloqueada. Libere a câmera para esta página ou use o leitor Bluetooth.",true); }
+}
+
+/* ---------- ações ---------- */
+function base(){ return {id:uid(), operador:S.slots.operador, maquina:S.slots.maquina, op:S.slots.op, etapa:S.slots.etapa, dispositivo:navigator.userAgent.slice(0,60)}; }
+function iniciar(){ const p={...base(),tipo:"inicio",inicio:new Date().toISOString()}; enfileirar(p);
+  const a=abertosLocais().filter(x=>!(x.maquina===p.maquina&&x.op===p.op)); a.push({maquina:p.maquina,op:p.op,inicio:p.inicio,operador:p.operador}); store.set("abertos",a);
+  sucesso("Produção iniciada · OP "+p.op, p.maquina+" às "+hhmm(p.inicio)+". Para finalizar, bipe a OP de novo.", null); S.slots.op=null; S.slots.etapa=null; render(); }
+function pedirQtd(inicio){ S.modo="qtd"; S.q={boa:"",refugo:""}; S.qsel="boa"; S.inicioFim=inicio; render(); }
+function enviarApont(){
+  const boa=Number(S.q.boa||0), ref=Number(S.q.refugo||0); if(!(boa>0||ref>0)){ toast("Informe peças boas ou refugo.",true); return; }
+  const ini=S.inicioFim; const p={...base(),tipo:"apontamento",modo:S.modoColeta||"OPERADOR",inicio:ini,fim:new Date().toISOString(),qtd_boa:boa,refugo:ref};
+  const antes=abertosLocais(); enfileirar(p,8000); store.set("abertos",antes.filter(x=>!(x.maquina===p.maquina&&String(x.op)===String(p.op))));
+  sucesso(`OP ${p.op} · ${fmtN(boa)} boas · ${fmtN(ref)} refugo`, `${p.maquina} · ${hhmm(p.inicio)} → ${hhmm(p.fim)}`, ()=>{ store.set("fila",fila().filter(x=>x.id!==p.id)); store.set("abertos",antes); S.slots.op=p.op; S.slots.etapa=p.etapa; render(); toast("Desfeito. Corrija e envie de novo."); });
+  S.modo=null; S.slots.op=null; S.slots.etapa=null; S.inicioManual=null; render(); }
+let doneT=null;
+function sucesso(t,sub,undo){ const d=$("done"); $("done-t").textContent=t; $("done-s").textContent=sub; d.hidden=false; beep(true);
+  const b=$("btn-desfazer"); let n=8; b.textContent=`Desfazer (${n}s)`; b.hidden=!undo; clearInterval(doneT);
+  doneT=setInterval(()=>{ n--; b.textContent=`Desfazer (${n}s)`; if(n<=0){ clearInterval(doneT); d.hidden=true; } },1000);
+  b.onclick=()=>{ clearInterval(doneT); d.hidden=true; undo&&undo(); };
+  d.onclick=e=>{ if(e.target===d){ clearInterval(doneT); d.hidden=true; } }; }
+function parada(){ S.modo="parada"; render(); }
+function iniciarParada(m){ const p={inicio:new Date().toISOString(),codigo:m.codigo,descricao:m.descricao,maquina:S.slots.maquina,op:S.slots.op||"",operador:S.slots.operador};
+  store.set("parada",p); S.modo=null; render(); }
+function fimParada(){ const p=store.get("parada",null); if(!p) return;
+  enfileirar({id:uid(),tipo:"parada",operador:p.operador,maquina:p.maquina,op:p.op,motivo_codigo:p.codigo,motivo:p.descricao,inicio:p.inicio,fim:new Date().toISOString()});
+  store.set("parada",null); toast("Parada enviada: "+p.descricao); render(); }
+function tecla(k){ let v=String(S.q[S.qsel]||""); if(k==="C") v=""; else if(k==="⌫") v=v.slice(0,-1); else if(v.length<7) v=(v+k).replace(/^0+(?=\d)/,""); S.q[S.qsel]=v; render(); }
+
+/* ---------- render ---------- */
+function slot(t,v,s){ const el=$("s-"+t); el.classList.toggle("on",!!v); el.querySelector(".v").textContent=v||"—"; if(s!=null) el.querySelector(".s").textContent=s; }
+function render(){
+  const sl=S.slots, o=S.opInfo;
+  const opr=(S.cad.operadores||[]).find(x=>String(x.cracha)===String(sl.operador));
+  slot("operador",sl.operador,opr?opr.nome:"crachá");
+  slot("maquina",sl.maquina,"etiqueta da máquina");
+  slot("op",sl.op,o?`${o.cliente||""} · ${String(o.descricao||"").slice(0,28)}`:"código da OP impressa");
+  slot("etapa",sl.etapa?"F"+sl.etapa:null,sl.etapa?"preenchida pela OP":"vem da OP");
+  const falta=!sl.operador?"Aponte para o crachá":!sl.maquina?"Agora a etiqueta da máquina":!sl.op?"Agora o código da OP":"";
+  const par=store.get("parada",null);
+  $("hint").textContent = par ? "" : falta;
+  const sh=$("sheet"); let h="";
+  if(par){
+    const min=Math.round((Date.now()-new Date(par.inicio))/60000);
+    h=`<h2 style="color:var(--bad)">Máquina parada · ${esc(par.descricao)}</h2><div class="sub">${esc(par.maquina)} · desde ${hhmm(par.inicio)} · ${min} min</div>
+       <button class="b go full" data-a="fimpar">Voltar a produzir</button>`;
+  } else if(S.modo==="parada"){
+    h=`<h2>Motivo da parada</h2><div class="mot">${(S.cad.motivos||[]).map(m=>`<button data-mot="${esc(m.codigo)}">${esc(m.descricao)}</button>`).join("")}</div><button class="b sm full" data-a="voltar">Voltar</button>`;
+  } else if(S.modo==="qtd"){
+    h=`<h2>OP ${esc(sl.op)} · quanto saiu?</h2><div class="sub">${esc(sl.maquina)} · início ${hhmm(S.inicioFim)}</div>
+      <div class="qty"><div class="q ${S.qsel==="boa"?"sel":""}" data-q="boa"><div class="k">PEÇAS BOAS</div><div class="v">${esc(S.q.boa||"0")}</div></div>
+      <div class="q ${S.qsel==="refugo"?"sel":""}" data-q="refugo"><div class="k">REFUGO</div><div class="v">${esc(S.q.refugo||"0")}</div></div></div>
+      ${S.qsel==="boa"&&o&&o.restante>0?`<div class="fill"><button data-fill="${Math.round(o.restante)}">Fechou a OP: ${fmtN(o.restante)}</button></div>`:""}
+      <div class="pad">${["7","8","9","4","5","6","1","2","3","C","0","⌫"].map(k=>`<button data-k="${k}">${k}</button>`).join("")}</div>
+      <div class="btns"><button class="b sm" data-a="voltar">Voltar</button><button class="b go" data-a="enviar">Enviar</button></div>`;
+  } else if(S.modo==="ronda"){
+    const opts=[[30,"há 30 min"],[60,"há 1 h"],[120,"há 2 h"],[240,"há 4 h"],[480,"início do turno"]];
+    h=`<h2>Lançar produção já feita</h2><div class="sub">Quando começou a OP ${esc(sl.op)} na ${esc(sl.maquina)}?</div>
+      <div class="when">${opts.map(x=>`<button data-ini="${x[0]}" class="${S.inicioManual===x[0]?"on":""}">${x[1]}</button>`).join("")}</div>
+      <div class="btns"><button class="b sm" data-a="voltar">Voltar</button><button class="b act" data-a="rondaok" ${S.inicioManual?"":"disabled"}>Continuar</button></div>`;
+  } else if(sl.operador&&sl.maquina&&sl.op){
+    const ab=abertoDe(sl.maquina,sl.op);
+    h=`<h2>OP ${esc(sl.op)}${sl.etapa?" · F"+esc(sl.etapa):""}</h2><div class="sub">${o?esc((o.cliente||"")+" · "+(o.descricao||"")):""}${o&&o.maquina_prog&&o.maquina_prog!==sl.maquina?` · <span style="color:var(--warn)">programada para ${esc(o.maquina_prog)}</span>`:""}</div>
+      ${ab?`<div class="sub">Rodando desde <b style="color:var(--ink)">${hhmm(ab.inicio)}</b></div><div class="btns"><button class="b stop" data-a="parada">Parada</button><button class="b go" data-a="finalizar">Finalizar OP</button></div>`
+        :`<div class="btns"><button class="b go" data-a="iniciar">Iniciar agora</button><button class="b stop" data-a="parada">Parada</button><button class="b sm full" data-a="ronda">Já terminou: lançar produção feita</button></div>`}`;
+  } else if(sl.operador&&sl.maquina){
+    const ab=[...abertosLocais(),...(S.cad.abertos||[])].filter((x,i,arr)=>x.maquina===sl.maquina&&arr.findIndex(y=>y.maquina===x.maquina&&String(y.op)===String(x.op))===i);
+    h=`${ab.length?`<div class="sub">Rodando na ${esc(sl.maquina)} — toque para finalizar sem bipar de novo:</div><div class="open">${ab.map(x=>`<button data-fin="${esc(x.op)}"><span>OP ${esc(x.op)}</span><span>desde ${hhmm(x.inicio)} ›</span></button>`).join("")}</div>`:`<div class="sub">${esc(sl.maquina)} · operador ${esc(sl.operador)}. Bipe a OP para começar ou registre uma parada.</div>`}
+      <button class="b stop full" data-a="parada">Registrar parada</button>`;
+  }
+  h+=`<div class="manual"><input id="man" placeholder="digitar código" inputmode="text"><button class="b sm" data-a="man" style="padding:0 14px">OK</button></div>`;
+  sh.innerHTML=h; sh.hidden=false;
+  document.body.classList.toggle("modo",!!S.modo);
+}
+$("sheet").addEventListener("click",e=>{
+  const b=e.target.closest("button,[data-q]"); if(!b) return;
+  if(b.dataset.k) return tecla(b.dataset.k);
+  if(b.dataset.fill){ S.q.boa=b.dataset.fill; S.qsel="refugo"; return render(); }
+  if(b.dataset.fin){ const a=abertosLocais().find(x=>x.maquina===S.slots.maquina&&String(x.op)===b.dataset.fin)||(S.cad.abertos||[]).find(x=>x.maquina===S.slots.maquina&&String(x.op)===b.dataset.fin); S.slots.op=b.dataset.fin; S.opInfo=(S.cad.ops||[]).find(o=>String(o.op)===b.dataset.fin)||null; S.slots.etapa=S.opInfo&&S.opInfo.fase!=null?String(S.opInfo.fase):S.slots.etapa; S.modoColeta="OPERADOR"; return pedirQtd(a.inicio); }
+  if(b.dataset.q){ S.qsel=b.dataset.q; return render(); }
+  if(b.dataset.mot){ const m=(S.cad.motivos||[]).find(x=>String(x.codigo)===b.dataset.mot); return iniciarParada(m); }
+  if(b.dataset.ini){ S.inicioManual=Number(b.dataset.ini); return render(); }
+  const a=b.dataset.a;
+  if(a==="iniciar") iniciar();
+  else if(a==="finalizar"){ const ab=abertoDe(S.slots.maquina,S.slots.op); S.modoColeta="OPERADOR"; pedirQtd(ab.inicio); }
+  else if(a==="parada") parada();
+  else if(a==="fimpar") fimParada();
+  else if(a==="voltar"){ S.modo=null; render(); }
+  else if(a==="enviar") enviarApont();
+  else if(a==="ronda"){ S.modo="ronda"; S.inicioManual=null; render(); }
+  else if(a==="rondaok"){ S.modoColeta="RONDA"; pedirQtd(new Date(Date.now()-S.inicioManual*60000).toISOString()); }
+  else if(a==="man"){ const v=$("man").value; $("man").value=""; S.last={code:"",t:0}; lido(v); }
+});
+$("btn-limpar").addEventListener("click",()=>{ S.slots={operador:null,maquina:null,op:null,etapa:null}; S.opInfo=null; S.modo=null; salvarSticky(); render(); });
+/* leitor Bluetooth (teclado) */
+const kbd=$("kbd"); kbd.addEventListener("keydown",e=>{ if(e.key==="Enter"){ const v=kbd.value; kbd.value=""; S.last={code:"",t:0}; lido(v); } });
+document.addEventListener("click",e=>{ if(!e.target.closest("input")) setTimeout(()=>kbd.focus({preventScroll:true}),0); });
+
+async function iniciarApp(cam){
+  $("start").hidden=true; await carregar();
+  const st=store.get("sticky",{}); S.slots.operador=st.operador||null; S.slots.maquina=st.maquina||null;
+  render(); enviarFila(); kbd.focus();
+  if(cam) abrirCamera();
+}
+$("btn-start").addEventListener("click",()=>iniciarApp(true));
+$("btn-nocam").addEventListener("click",()=>iniciarApp(false));
+setInterval(()=>{ if(store.get("parada",null)) render(); },30000);
+})();
+</script>
+</body>
+</html>
